@@ -1,0 +1,53 @@
+{
+    "name": "vs-code-js-import-organizer",
+    "displayName": "Import organizer",
+    "description": "This extension organize your imports with comments",
+    "version": "0.1.0",
+    "publisher": "mRaffaello",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/mRaffaello/vs-code-js-import-organizer"
+    },
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.66.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:vs-code-js-import-organizer.organizeFileImports"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "vs-code-js-import-organizer.organizeFileImports",
+                "title": "Organize file imports"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "yarn run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "yarn run compile && yarn run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/glob": "^7.2.0",
+        "@types/mocha": "^9.1.0",
+        "@types/node": "14.x",
+        "@types/vscode": "^1.66.0",
+        "@typescript-eslint/eslint-plugin": "^5.16.0",
+        "@typescript-eslint/parser": "^5.16.0",
+        "@vscode/test-electron": "^2.1.3",
+        "eslint": "^8.11.0",
+        "mocha": "^9.2.2",
+        "typescript": "^4.5.5"
+    },
+    "dependencies": {
+        "is-subdir": "^1.2.0"
+    }
+}
