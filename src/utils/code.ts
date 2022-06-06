@@ -2,7 +2,7 @@ import { LINE_TYPE } from '../types/enums';
 import { DecodedImport } from '../types/types';
 
 export const getFromImport = (line: string): string | undefined => {
-    const matches = line.match(/\'.*\'/gm);
+    const matches = line.match(/(\'.*\')|(\".*\")/gm);
     if (matches) return matches[0].slice(1, -1);
 };
 

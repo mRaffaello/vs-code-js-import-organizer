@@ -7,6 +7,8 @@ export const getAllFiles = (
     includeDirs = false,
     arrayOfFiles: string[] = []
 ): string[] => {
+    if (!fs.existsSync(dirPath)) return [];
+
     let files = fs.readdirSync(dirPath).filter(f => !f.startsWith('.'));
 
     files.forEach(file => {

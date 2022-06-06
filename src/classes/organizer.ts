@@ -18,10 +18,17 @@ class ImportOrganizer {
     private foldersMap = new Map<string, string>();
     private config: Config;
 
-    // Private constructor
+    // Constructor
     public constructor(config: Config, rootFolder: string) {
         this.rootFolder = rootFolder;
         this.config = config;
+        this.onFsStructureChange();
+    }
+
+    /**
+     * Rebuild the file maps on every fs change
+     */
+    public onFsStructureChange() {
         this.buildLibrariesMap();
         this.buildFoldersMap();
     }
@@ -157,9 +164,8 @@ class ImportOrganizer {
                     const currentBlockImports = importMap.get(block);
                     importMap.set(block, [...(currentBlockImports || []), l]);
                 } else {
-                    const absPath = path
-                        .resolve(filePath, '..', match)
-                        .replace(this.rootFolder, '');
+                    let absPath = path.resolve(filePath, '..', match).replace(this.rootFolder, '');
+                    absPath = removeExtension(absPath);
 
                     const block = this.foldersMap.get(absPath) || OTHER_KEY;
                     const currentBlockImports = importMap.get(block);

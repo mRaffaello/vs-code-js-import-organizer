@@ -5,7 +5,7 @@ import { DEFAULT_ALLOWED_EXTENSIONS } from './constants';
 import { Config } from '../types/types';
 
 export default {
-    root: 'app',
+    root: 'src',
     allowedExtensions: DEFAULT_ALLOWED_EXTENSIONS,
     blocks: [
         {

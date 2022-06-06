@@ -17,19 +17,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as isSubdir from 'is-subdir';
 
+let watcher: vscode.FileSystemWatcher;
+
 export function activate(context: vscode.ExtensionContext) {
     // Get root folder & config
     const folder = vscode.workspace.workspaceFolders![0].uri.path;
     const configPath = path.join(folder, CONFIG_FILE_NAME);
 
     // Load config
-    let config: Config;
+    let config: Config = {} as Config;
     try {
         config = JSON.parse(fs.readFileSync(configPath).toString());
     } catch (error) {
-        vscode.window.showWarningMessage('Invalid config. Loaded default');
         config = defaultConfig;
-        return;
+        vscode.window.showWarningMessage(
+            'No config found. A default one will be loaded\nPlease add a .sorterconfig.json inside your root folder.\nFor more info visit https://marketplace.visualstudio.com/items?itemName=mRaffaello.vs-code-js-import-organizer&ssr=false#overview'
+        );
     }
 
     const rootFolder = path.join(folder, config.root);
@@ -86,8 +89,26 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Register on file change
+    watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(vscode.workspace.workspaceFolders![0], '**/*')
+    );
+
+    watcher.onDidChange(() => {
+        organizer.onFsStructureChange();
+    });
+    watcher.onDidCreate(() => {
+        organizer.onFsStructureChange();
+    });
+    watcher.onDidDelete(() => {
+        organizer.onFsStructureChange();
+    });
+
+    // Clear
     context.subscriptions.push(disposable);
 }
 
 // this method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+    watcher.dispose();
+}
