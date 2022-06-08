@@ -17,7 +17,58 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as isSubdir from 'is-subdir';
 
-let watcher: vscode.FileSystemWatcher;
+function organize(rootFolder: string, config: Config, organizer: ImportOrganizer, verbose = false) {
+    // Check that root folder exists
+    if (!fs.existsSync(rootFolder)) {
+        verbose && vscode.window.showWarningMessage('Specified root folder does not exists');
+        return;
+    }
+
+    // Get filename
+    const fileName = vscode.window.activeTextEditor?.document.fileName;
+    if (!fileName || !fs.existsSync(fileName)) {
+        verbose && vscode.window.showWarningMessage('Selected file does not exists');
+        return;
+    }
+
+    // Check for errors
+    const diagnostics = vscode.languages.getDiagnostics(vscode.Uri.file(fileName));
+    const hasErrors = !!diagnostics.find(d => d.severity === 0);
+    if (hasErrors) {
+        verbose && vscode.window.showWarningMessage('Sorting requires a file without errors');
+        return;
+    }
+
+    // Organize
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+        const document = editor.document.getText();
+
+        // Check current file
+        const extension = getExtension(editor.document.fileName);
+        const allowedExtensions = config.allowedExtensions || DEFAULT_ALLOWED_EXTENSIONS;
+        if (!isSubdir(rootFolder, editor.document.fileName)) return;
+        if (!extension || !allowedExtensions.includes(extension)) {
+            vscode.window.showWarningMessage('Current file type is not supported');
+            return;
+        }
+
+        // Get import lines
+        const { organizedImport, lastImportLineNumber } = organizer.organizeImport(
+            fileName,
+            document
+        );
+        editor.edit(editBuilder => {
+            editBuilder.replace(
+                new vscode.Range(
+                    new vscode.Position(0, 0),
+                    new vscode.Position(lastImportLineNumber, 0)
+                ),
+                organizedImport
+            );
+        });
+    } else vscode.window.showWarningMessage('No file opened');
+}
 
 export function activate(context: vscode.ExtensionContext) {
     // Get root folder & config
@@ -41,74 +92,37 @@ export function activate(context: vscode.ExtensionContext) {
     const organizer = new ImportOrganizer(config, rootFolder);
 
     // Register organize file imports command
-    let disposable = vscode.commands.registerCommand(
+    const cmdWatcher = vscode.commands.registerCommand(
         'vs-code-js-import-organizer.organizeFileImports',
-        () => {
-            // Check that root folder exists
-            if (!fs.existsSync(rootFolder)) {
-                vscode.window.showWarningMessage('Specified root folder does not exists');
-                return;
-            }
-
-            // Check that files exists
-            const file = vscode.window.activeTextEditor!.document.uri.fsPath;
-            if (!fs.existsSync(file)) {
-                vscode.window.showWarningMessage('Selected file does not exists');
-                return;
-            }
-
-            // Organize
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                const document = editor.document.getText();
-
-                // Check current file
-                const extension = getExtension(editor.document.fileName);
-                const allowedExtensions = config.allowedExtensions || DEFAULT_ALLOWED_EXTENSIONS;
-                if (!isSubdir(rootFolder, editor.document.fileName)) return;
-                if (!extension || !allowedExtensions.includes(extension)) {
-                    vscode.window.showWarningMessage('Current file type is not supported');
-                    return;
-                }
-
-                // Get import lines
-                const { organizedImport, lastImportLineNumber } = organizer.organizeImport(
-                    file,
-                    document
-                );
-                editor.edit(editBuilder => {
-                    editBuilder.replace(
-                        new vscode.Range(
-                            new vscode.Position(0, 0),
-                            new vscode.Position(lastImportLineNumber, 0)
-                        ),
-                        organizedImport
-                    );
-                });
-            } else vscode.window.showWarningMessage('No file opened');
-        }
+        () => organize(rootFolder, config, organizer, true)
     );
 
+    // Register on save trigger
+    const saveWatcher = vscode.workspace.onWillSaveTextDocument(() => {
+        const fileName = vscode.window.activeTextEditor?.document.fileName;
+        if (fileName) {
+            const diagnostics = vscode.languages.getDiagnostics(vscode.Uri.file(fileName));
+            const hasErrors = !!diagnostics.find(d => d.severity === 0);
+            if (hasErrors) return;
+            organize(rootFolder, config, organizer);
+        }
+    });
+
     // Register on file change
-    watcher = vscode.workspace.createFileSystemWatcher(
+    const fsWatcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(vscode.workspace.workspaceFolders![0], '**/*')
     );
 
-    watcher.onDidChange(() => {
+    fsWatcher.onDidChange(() => {
         organizer.onFsStructureChange();
     });
-    watcher.onDidCreate(() => {
+    fsWatcher.onDidCreate(() => {
         organizer.onFsStructureChange();
     });
-    watcher.onDidDelete(() => {
+    fsWatcher.onDidDelete(() => {
         organizer.onFsStructureChange();
     });
 
     // Clear
-    context.subscriptions.push(disposable);
-}
-
-// this method is called when your extension is deactivated
-export function deactivate() {
-    watcher.dispose();
+    context.subscriptions.push(cmdWatcher, fsWatcher, saveWatcher);
 }
