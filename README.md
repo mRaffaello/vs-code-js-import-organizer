@@ -18,6 +18,7 @@ The extensions requires a configuration file inside the root of your project cal
 | Parameter            | Type       | Description                                                                                |
 | :------------------- | :--------- | :----------------------------------------------------------------------------------------- |
 | `root`               | `string`   | **Required**. Path for the source folder. Files that are not included here will be ignored |
+| `organizeOnSave`     | `string`   | Organize import on document save. Defaults to false                                        |
 | `allowedExtensions?` | `string[]` | Allowed extensions                                                                         |
 | `blocks`             | `Block[]`  | **Required** Specifies the groups                                                          |
 

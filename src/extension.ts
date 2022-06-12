@@ -17,13 +17,75 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as isSubdir from 'is-subdir';
 
-function organize(rootFolder: string, config: Config, organizer: ImportOrganizer, verbose = false) {
-    // Check that root folder exists
-    if (!fs.existsSync(rootFolder)) {
-        verbose && vscode.window.showWarningMessage('Specified root folder does not exists');
-        return;
-    }
+// Global variables
+let organizer: ImportOrganizer;
+let config: Config;
+let rootFolder: string;
+let verbose = false;
 
+/**
+ * Loads extension config from file
+ * @param configPath filePath
+ * @returns parsed Config
+ */
+function loadConfig(folder: string, configPath: string) {
+    let config: Config = {} as Config;
+    try {
+        config = JSON.parse(fs.readFileSync(configPath).toString());
+        rootFolder = path.join(folder, config.root);
+
+        // Check that root folder exists
+        if (!fs.existsSync(rootFolder)) {
+            vscode.window.showErrorMessage('Specified root folder does not exists');
+            throw new Error();
+        }
+    } catch (error) {
+        config = defaultConfig;
+        vscode.window.showWarningMessage(
+            'No config found or the one provided contains errors, a default one will be loaded.\nPlease add a valid .sorterconfig.json inside your root folder.\nFor more info visit https://marketplace.visualstudio.com/items?itemName=mRaffaello.vs-code-js-import-organizer&ssr=false#overview'
+        );
+    }
+    return config;
+}
+
+/**
+ * Updates the current specified cofiguration
+ */
+function onConfigUpdate() {
+    // Get root folder & config
+    const folder = vscode.workspace.workspaceFolders![0].uri.path;
+    const configPath = path.join(folder, CONFIG_FILE_NAME);
+
+    // Load config
+    config = loadConfig(folder, configPath);
+
+    // Initialize organizer
+    organizer = new ImportOrganizer(config, rootFolder);
+}
+
+/**
+ * Adds save watcher to the workspace
+ * @param onSave onSave callback
+ * @returns saveWatcher
+ */
+function createOnSaveWatcher(onSave: () => void) {
+    return vscode.workspace.onWillSaveTextDocument(() => {
+        if (!config.organizeOnSave) return;
+        const fileName = vscode.window.activeTextEditor?.document.fileName;
+        if (fileName) {
+            const diagnostics = vscode.languages.getDiagnostics(vscode.Uri.file(fileName));
+            const hasErrors = !!diagnostics.find(d => d.severity === 0);
+            if (hasErrors) return;
+            onSave();
+        }
+    });
+}
+
+/**
+ * Organizes import
+ * @param verbose shows messages to the user
+ */
+function organize() {
     // Get filename
     const fileName = vscode.window.activeTextEditor?.document.fileName;
     if (!fileName || !fs.existsSync(fileName)) {
@@ -49,80 +111,67 @@ function organize(rootFolder: string, config: Config, organizer: ImportOrganizer
         const allowedExtensions = config.allowedExtensions || DEFAULT_ALLOWED_EXTENSIONS;
         if (!isSubdir(rootFolder, editor.document.fileName)) return;
         if (!extension || !allowedExtensions.includes(extension)) {
-            vscode.window.showWarningMessage('Current file type is not supported');
+            verbose && vscode.window.showWarningMessage('Current file type is not supported');
             return;
         }
 
         // Get import lines
-        const { organizedImport, lastImportLineNumber } = organizer.organizeImport(
-            fileName,
-            document
-        );
-        editor.edit(editBuilder => {
-            editBuilder.replace(
-                new vscode.Range(
-                    new vscode.Position(0, 0),
-                    new vscode.Position(lastImportLineNumber, 0)
-                ),
-                organizedImport
-            );
-        });
-    } else vscode.window.showWarningMessage('No file opened');
+        const organizerResult = organizer.organizeImport(fileName, document);
+
+        if (organizerResult) {
+            const { organizedImport, lastImportLineNumber } = organizerResult;
+            editor.edit(editBuilder => {
+                editBuilder.replace(
+                    new vscode.Range(
+                        new vscode.Position(0, 0),
+                        new vscode.Position(lastImportLineNumber, 0)
+                    ),
+                    organizedImport
+                );
+            });
+        }
+    } else if (verbose) vscode.window.showWarningMessage('No file opened');
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    // Get root folder & config
-    const folder = vscode.workspace.workspaceFolders![0].uri.path;
-    const configPath = path.join(folder, CONFIG_FILE_NAME);
+    const disposables: vscode.Disposable[] = [];
 
-    // Load config
-    let config: Config = {} as Config;
-    try {
-        config = JSON.parse(fs.readFileSync(configPath).toString());
-    } catch (error) {
-        config = defaultConfig;
-        vscode.window.showWarningMessage(
-            'No config found. A default one will be loaded\nPlease add a .sorterconfig.json inside your root folder.\nFor more info visit https://marketplace.visualstudio.com/items?itemName=mRaffaello.vs-code-js-import-organizer&ssr=false#overview'
-        );
-    }
-
-    const rootFolder = path.join(folder, config.root);
-
-    // Initialize organizer
-    const organizer = new ImportOrganizer(config, rootFolder);
+    // Load initial config
+    onConfigUpdate();
 
     // Register organize file imports command
     const cmdWatcher = vscode.commands.registerCommand(
         'vs-code-js-import-organizer.organizeFileImports',
-        () => organize(rootFolder, config, organizer, true)
-    );
-
-    // Register on save trigger
-    const saveWatcher = vscode.workspace.onWillSaveTextDocument(() => {
-        const fileName = vscode.window.activeTextEditor?.document.fileName;
-        if (fileName) {
-            const diagnostics = vscode.languages.getDiagnostics(vscode.Uri.file(fileName));
-            const hasErrors = !!diagnostics.find(d => d.severity === 0);
-            if (hasErrors) return;
-            organize(rootFolder, config, organizer);
+        () => {
+            verbose = true;
+            organize();
+            verbose = false;
         }
-    });
+    );
+    disposables.push(cmdWatcher);
 
     // Register on file change
     const fsWatcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(vscode.workspace.workspaceFolders![0], '**/*')
     );
+    disposables.push(fsWatcher);
 
-    fsWatcher.onDidChange(() => {
+    fsWatcher.onDidChange(f => {
+        if (f.path.endsWith(CONFIG_FILE_NAME)) onConfigUpdate();
         organizer.onFsStructureChange();
     });
-    fsWatcher.onDidCreate(() => {
+    fsWatcher.onDidCreate(f => {
+        if (f.path.endsWith(CONFIG_FILE_NAME)) onConfigUpdate();
         organizer.onFsStructureChange();
     });
-    fsWatcher.onDidDelete(() => {
+    fsWatcher.onDidDelete(f => {
+        if (f.path.endsWith(CONFIG_FILE_NAME)) onConfigUpdate();
         organizer.onFsStructureChange();
     });
+
+    const saveWatcher = createOnSaveWatcher(() => organize());
+    disposables.push(saveWatcher);
 
     // Clear
-    context.subscriptions.push(cmdWatcher, fsWatcher, saveWatcher);
+    context.subscriptions.push(...disposables);
 }

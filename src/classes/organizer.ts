@@ -26,6 +26,15 @@ class ImportOrganizer {
     }
 
     /**
+     * Update config
+     * @param config new Config
+     */
+    public updateConfig(config: Config) {
+        this.config = config;
+        this.onFsStructureChange();
+    }
+
+    /**
      * Rebuild the file maps on every fs change
      */
     public onFsStructureChange() {
@@ -140,9 +149,10 @@ class ImportOrganizer {
      * Organize file imports using the provided config file
      * @param filePath path of the file
      */
-    public organizeImport(filePath: string, file: string): OrganizerResult {
+    public organizeImport(filePath: string, file: string): OrganizerResult | undefined {
         // Get all export lines
         const importLines = this.getImportLines(file);
+        if (importLines.lines.length === 0) return;
 
         // Initialize map
         const importMap = new Map<string, string[]>();

@@ -8,6 +8,7 @@ export type Block = {
 
 export type Config = {
     root: string;
+    organizeOnSave: boolean;
     blocks: Block[];
     allowedExtensions?: string[];
 };

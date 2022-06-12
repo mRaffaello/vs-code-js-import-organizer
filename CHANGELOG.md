@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2022-06-13
+
+### Added
+
+-   Config parameter `organizeOnSave`
+-   Config reload on changes
+
+### Fixed
+
+-   Organization of files without imports
+
+### Removed
+
+-   Unsupported file type when organizing on save
+
 ## [0.2.0] - 2022-06-08
 
 ### Added
