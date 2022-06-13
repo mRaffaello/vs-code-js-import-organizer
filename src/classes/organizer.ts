@@ -102,7 +102,7 @@ class ImportOrganizer {
                     c++;
                 }
                 importLines.push(multiline.slice(0, -1));
-                lastImportLineNumber = i;
+                lastImportLineNumber = i + c - 1;
             }
         }
 

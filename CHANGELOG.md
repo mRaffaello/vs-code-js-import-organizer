@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2022-06-13
+
+### Fixed
+
+-   Duplicate import error when multiLine import as last line
+
 ## [0.2.1] - 2022-06-13
 
 ### Added
