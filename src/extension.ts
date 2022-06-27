@@ -6,7 +6,7 @@ import defaultConfig from './config/config';
 import { CONFIG_FILE_NAME, DEFAULT_ALLOWED_EXTENSIONS } from './config/constants';
 
 // Utils
-import { getExtension } from './utils/files';
+import { getExtension, isSubdir } from './utils/files';
 
 // Types
 import { Config } from './types/types';
@@ -15,7 +15,6 @@ import { Config } from './types/types';
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as isSubdir from 'is-subdir';
 
 // Global variables
 let organizer: ImportOrganizer;

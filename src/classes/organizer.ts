@@ -2,7 +2,7 @@
 import { OTHER_KEY } from '../config/constants';
 
 // Utils
-import { getAllFiles, removeExtension } from '../utils/files';
+import { getAllFiles, isSubdir, removeExtension } from '../utils/files';
 import { getFromImport, decodeImport } from '../utils/code';
 
 // Types
@@ -10,7 +10,6 @@ import { Config, OrganizerResult } from '../types/types';
 
 // Others
 import * as path from 'path';
-import * as isSubdir from 'is-subdir';
 
 class ImportOrganizer {
     private rootFolder: string;
@@ -60,7 +59,9 @@ class ImportOrganizer {
         const tempMap = new Map<string, string>();
 
         this.config.blocks.forEach(b => {
-            b.folders?.forEach(f => tempMap.set(f, b.name));
+            b.folders?.forEach(f => {
+                if (!f.startsWith('/')) tempMap.set(`/${f}`, b.name);
+            });
         });
 
         const files = getAllFiles(this.rootFolder, true);

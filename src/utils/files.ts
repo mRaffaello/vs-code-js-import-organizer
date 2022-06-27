@@ -27,3 +27,8 @@ export const removeExtension = (path: string): string => {
     const split = path.split('.');
     return split.length > 1 ? path.split('.').slice(0, -1).join('.') : path;
 };
+
+export const isSubdir = (parentDir: string, subdir: string) => {
+    subdir = path.resolve(subdir);
+    return subdir.startsWith(parentDir);
+};
