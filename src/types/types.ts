@@ -13,6 +13,12 @@ export type Config = {
     allowedExtensions?: string[];
 };
 
+export type JTsConfig = {
+    compilerOptions?: {
+        baseUrl?: string;
+    };
+};
+
 export type OrganizerResult = {
     organizedImport: string;
     lastImportLineNumber: number;

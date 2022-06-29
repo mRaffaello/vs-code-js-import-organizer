@@ -13,23 +13,17 @@ import * as path from 'path';
 
 class ImportOrganizer {
     private rootFolder: string;
+    private baseUrlFolder?: string;
     private librariesMap = new Map<string, string>();
     private foldersMap = new Map<string, string>();
+    private librariesList: string[] = [];
     private config: Config;
 
     // Constructor
-    public constructor(config: Config, rootFolder: string) {
+    public constructor(config: Config, rootFolder: string, baseUrlFolder?: string) {
         this.rootFolder = rootFolder;
         this.config = config;
-        this.onFsStructureChange();
-    }
-
-    /**
-     * Update config
-     * @param config new Config
-     */
-    public updateConfig(config: Config) {
-        this.config = config;
+        this.baseUrlFolder = baseUrlFolder;
         this.onFsStructureChange();
     }
 
@@ -49,6 +43,7 @@ class ImportOrganizer {
         this.config.blocks.forEach(b => {
             b.libraries?.forEach(l => this.librariesMap.set(l, b.name));
         });
+        this.librariesList = Array.from(this.librariesMap.keys());
     }
 
     /**
@@ -147,6 +142,19 @@ class ImportOrganizer {
     }
 
     /**
+     * Checks if a given path belongs to a library
+     * @param path
+     * @returns
+     */
+    private isLibraryImport(path: string): boolean {
+        for (const library of this.librariesList)
+            if (library.startsWith(path)) {
+                return true;
+            }
+        return false;
+    }
+
+    /**
      * Organize file imports using the provided config file
      * @param filePath path of the file
      */
@@ -165,8 +173,8 @@ class ImportOrganizer {
             // Find regex
             const match = getFromImport(l);
             if (match) {
-                // Check if is library
-                if (!match.startsWith('.')) {
+                // Is library
+                if (this.isLibraryImport(match)) {
                     const split = match.split('/');
                     let library: string;
                     if (!match.startsWith('@')) library = split[0];
@@ -174,10 +182,25 @@ class ImportOrganizer {
                     const block = this.librariesMap.get(library) || OTHER_KEY;
                     const currentBlockImports = importMap.get(block);
                     importMap.set(block, [...(currentBlockImports || []), l]);
-                } else {
+                }
+                // Is file referenced by base path
+                else if (this.baseUrlFolder && !match.startsWith('.')) {
+                    let absPath = path
+                        .resolve(this.baseUrlFolder, match)
+                        .replace(this.rootFolder, '');
+                    const block = this.foldersMap.get(absPath) || OTHER_KEY;
+                    const currentBlockImports = importMap.get(block);
+                    importMap.set(block, [...(currentBlockImports || []), l]);
+                }
+                // Is library not specified
+                else if (!match.startsWith('.')) {
+                    const currentBlockImports = importMap.get(OTHER_KEY);
+                    importMap.set(OTHER_KEY, [...(currentBlockImports || []), l]);
+                }
+                // Is file not referenced by base path
+                else {
                     let absPath = path.resolve(filePath, '..', match).replace(this.rootFolder, '');
                     absPath = removeExtension(absPath);
-
                     const block = this.foldersMap.get(absPath) || OTHER_KEY;
                     const currentBlockImports = importMap.get(block);
                     importMap.set(block, [...(currentBlockImports || []), l]);

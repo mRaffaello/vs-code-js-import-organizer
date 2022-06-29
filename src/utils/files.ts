@@ -28,6 +28,14 @@ export const removeExtension = (path: string): string => {
     return split.length > 1 ? path.split('.').slice(0, -1).join('.') : path;
 };
 
+export const parseJSONWithComments = (path: string) => {
+    let fileString = fs.readFileSync(path).toString();
+    fileString = fileString.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g) =>
+        g ? '' : m
+    );
+    return JSON.parse(fileString);
+};
+
 export const isSubdir = (parentDir: string, subdir: string) => {
     subdir = path.resolve(subdir);
     return subdir.startsWith(parentDir);

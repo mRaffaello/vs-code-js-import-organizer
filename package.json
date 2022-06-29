@@ -2,7 +2,7 @@
     "name": "vs-code-js-import-organizer",
     "displayName": "JS Import Organizer",
     "description": "This extension organize your imports with comments",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "publisher": "mRaffaello",
     "icon": "icon.png",
     "repository": {

@@ -3,13 +3,18 @@ import ImportOrganizer from './classes/organizer';
 
 // Config
 import defaultConfig from './config/config';
-import { CONFIG_FILE_NAME, DEFAULT_ALLOWED_EXTENSIONS } from './config/constants';
+import {
+    CONFIG_FILE_NAME,
+    DEFAULT_ALLOWED_EXTENSIONS,
+    JS_CONFIG_FILE_NAME,
+    TS_CONFIG_FILE_NAME
+} from './config/constants';
 
 // Utils
-import { getExtension, isSubdir } from './utils/files';
+import { getExtension, isSubdir, parseJSONWithComments } from './utils/files';
 
 // Types
-import { Config } from './types/types';
+import { Config, JTsConfig } from './types/types';
 
 // Others
 import * as vscode from 'vscode';
@@ -24,6 +29,7 @@ let verbose = false;
 
 /**
  * Loads extension config from file
+ * @param folder workspace folder
  * @param configPath filePath
  * @returns parsed Config
  */
@@ -48,6 +54,40 @@ function loadConfig(folder: string, configPath: string) {
 }
 
 /**
+ * Loads language config from file
+ * @param folder workspace folder
+ * @returns parsed JTsConfig
+ */
+function loadJTsConfig(folder: string) {
+    let jtsConfig: JTsConfig | undefined = undefined;
+
+    const tsConfigPath = path.join(folder, TS_CONFIG_FILE_NAME);
+    const jsConfigPath = path.join(folder, JS_CONFIG_FILE_NAME);
+
+    try {
+        if (fs.existsSync(tsConfigPath)) jtsConfig = parseJSONWithComments(tsConfigPath);
+        else if (fs.existsSync(jsConfigPath)) jtsConfig = parseJSONWithComments(tsConfigPath);
+    } catch (error) {
+        vscode.window.showWarningMessage('Error while parsing js/ts config fileß');
+    }
+
+    return jtsConfig;
+}
+
+/**
+ * Checks if the updated file needs a config update
+ * @param updatedPath
+ * @returns
+ */
+function needsConfigUpdate(updatedPath: string) {
+    return (
+        updatedPath.endsWith(CONFIG_FILE_NAME) ||
+        updatedPath.endsWith(TS_CONFIG_FILE_NAME) ||
+        updatedPath.endsWith(JS_CONFIG_FILE_NAME)
+    );
+}
+
+/**
  * Updates the current specified cofiguration
  */
 function onConfigUpdate() {
@@ -57,9 +97,16 @@ function onConfigUpdate() {
 
     // Load config
     config = loadConfig(folder, configPath);
+    const jtsConfig = loadJTsConfig(folder);
 
     // Initialize organizer
-    organizer = new ImportOrganizer(config, rootFolder);
+    if (jtsConfig?.compilerOptions?.baseUrl)
+        organizer = new ImportOrganizer(
+            config,
+            rootFolder,
+            path.join(folder, jtsConfig.compilerOptions.baseUrl)
+        );
+    else organizer = new ImportOrganizer(config, rootFolder);
 }
 
 /**
@@ -156,15 +203,15 @@ export function activate(context: vscode.ExtensionContext) {
     disposables.push(fsWatcher);
 
     fsWatcher.onDidChange(f => {
-        if (f.path.endsWith(CONFIG_FILE_NAME)) onConfigUpdate();
+        if (needsConfigUpdate(f.path)) onConfigUpdate();
         organizer.onFsStructureChange();
     });
     fsWatcher.onDidCreate(f => {
-        if (f.path.endsWith(CONFIG_FILE_NAME)) onConfigUpdate();
+        if (needsConfigUpdate(f.path)) onConfigUpdate();
         organizer.onFsStructureChange();
     });
     fsWatcher.onDidDelete(f => {
-        if (f.path.endsWith(CONFIG_FILE_NAME)) onConfigUpdate();
+        if (needsConfigUpdate(f.path)) onConfigUpdate();
         organizer.onFsStructureChange();
     });
 
